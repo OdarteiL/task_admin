@@ -1,101 +1,118 @@
-import Image from "next/image";
+"use client";
+
+import { useAuth } from "react-oidc-context";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const auth = useAuth();
+  const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      const groupsRaw = auth.user?.profile["cognito:groups"];
+      const userGroups = Array.isArray(groupsRaw)
+        ? groupsRaw
+        : typeof groupsRaw === "string"
+        ? [groupsRaw]
+        : [];
+
+      if (userGroups.includes("admin")) {
+        setRedirecting(true);
+        router.push("/admin");
+      } else if (userGroups.includes("field_team")) {
+        setRedirecting(true);
+        router.push("/team");
+      }
+    }
+  }, [auth.isAuthenticated, auth.user?.profile, router]);
+
+  const signOutRedirect = () => {
+    const clientId = "6n0odlf9mqqo07mcldq0l1has6";
+    const logoutUri = "http://localhost:3000"; // use http if testing locally
+    const cognitoDomain =
+      "https://us-west-2tazwhkr2d.auth.us-west-2.amazoncognito.com";
+
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(
+      logoutUri
+    )}`;
+  };
+
+  if (auth.isLoading || redirecting) {
+    return <p className="p-4 text-gray-600">Loading...</p>;
+  }
+
+  if (auth.error) {
+    return <p className="p-4 text-red-600">Error: {auth.error.message}</p>;
+  }
+
+  // Define username safely for JSX
+  let username = "User";
+  if (auth.isAuthenticated) {
+    username =
+      (auth.user?.profile["cognito:username"] as string) ||
+      (auth.user?.profile["preferred_username"] as string) ||
+      (auth.user?.profile.email as string) ||
+      "User";
+  }
+
+  if (auth.isAuthenticated) {
+    const groupsRaw = auth.user?.profile["cognito:groups"];
+    const userGroups = Array.isArray(groupsRaw)
+      ? groupsRaw
+      : typeof groupsRaw === "string"
+      ? [groupsRaw]
+      : [];
+
+    return (
+      <div className="p-6 space-y-4">
+        <h2 className="text-xl font-semibold">Welcome, {username}</h2>
+
+        <pre className="bg-gray-100 p-4 rounded text-sm overflow-x-auto">
+          {JSON.stringify(auth.user, null, 2)}
+        </pre>
+
+        <div className="space-x-4">
+          {userGroups.includes("admin") ? (
+            <>
+              <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                Admin Panel
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Team Dashboard
+              </button>
+            </>
+          )}
+          <button
+            className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded"
+            onClick={() => auth.removeUser()}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Sign out (local)
+          </button>
+          <button
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+            onClick={signOutRedirect}
           >
-            Read our docs
-          </a>
+            Sign out (Cognito)
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <h2 className="text-lg font-semibold mb-4">Not signed in</h2>
+      <button
+        onClick={() => auth.signinRedirect()}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Sign in
+      </button>
     </div>
   );
 }
