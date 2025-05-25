@@ -30,7 +30,7 @@ export default function Home() {
 
   const signOutRedirect = () => {
     const clientId = "6n0odlf9mqqo07mcldq0l1has6";
-    const logoutUri = "http://localhost:3000"; // use http if testing locally
+    const logoutUri = window.location.origin;
     const cognitoDomain =
       "https://us-west-2tazwhkr2d.auth.us-west-2.amazoncognito.com";
 
@@ -40,79 +40,92 @@ export default function Home() {
   };
 
   if (auth.isLoading || redirecting) {
-    return <p className="p-4 text-gray-600">Loading...</p>;
+    return <p className="p-6 text-gray-600">Loading your dashboard...</p>;
   }
 
   if (auth.error) {
-    return <p className="p-4 text-red-600">Error: {auth.error.message}</p>;
+    return <p className="p-6 text-red-600">Error: {auth.error.message}</p>;
   }
 
-  // Define username safely for JSX
-  let username = "User";
-  if (auth.isAuthenticated) {
-    username =
-      (auth.user?.profile["cognito:username"] as string) ||
-      (auth.user?.profile["preferred_username"] as string) ||
-      (auth.user?.profile.email as string) ||
-      "User";
-  }
+  const username =
+    (auth.user?.profile["cognito:username"] as string) ||
+    (auth.user?.profile["preferred_username"] as string) ||
+    (auth.user?.profile.email as string) ||
+    "User";
 
-  if (auth.isAuthenticated) {
-    const groupsRaw = auth.user?.profile["cognito:groups"];
-    const userGroups = Array.isArray(groupsRaw)
-      ? groupsRaw
-      : typeof groupsRaw === "string"
-      ? [groupsRaw]
-      : [];
+  const groupsRaw = auth.user?.profile["cognito:groups"];
+  const userGroups = Array.isArray(groupsRaw)
+    ? groupsRaw
+    : typeof groupsRaw === "string"
+    ? [groupsRaw]
+    : [];
 
-    return (
-      <div className="p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Welcome, {username}</h2>
+  return auth.isAuthenticated ? (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-md space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-gray-800">
+            Welcome back, {username} 👋
+          </h1>
+          <p className="text-sm text-gray-500">
+            You are signed in as{" "}
+            <span className="font-medium text-blue-600">
+              {userGroups.join(", ") || "guest"}
+            </span>
+          </p>
+        </div>
 
-        <pre className="bg-gray-100 p-4 rounded text-sm overflow-x-auto">
-          {JSON.stringify(auth.user, null, 2)}
-        </pre>
-
-        <div className="space-x-4">
-          {userGroups.includes("admin") ? (
-            <>
-              <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                Admin Panel
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                Team Dashboard
-              </button>
-            </>
+        <div className="flex flex-col space-y-3">
+          {userGroups.includes("admin") && (
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg"
+              onClick={() => router.push("/admin")}
+            >
+              Go to Admin Panel
+            </button>
           )}
+          {userGroups.includes("field_team") && (
+            <button
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg"
+              onClick={() => router.push("/team")}
+            >
+              Go to Team Dashboard
+            </button>
+          )}
+        </div>
+
+        <div className="flex justify-between pt-4 border-t">
           <button
-            className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded"
+            className="text-sm text-gray-500 hover:underline"
             onClick={() => auth.removeUser()}
           >
-            Sign out (local)
+            Sign out (Local)
           </button>
           <button
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+            className="text-sm text-red-500 hover:underline"
             onClick={signOutRedirect}
           >
             Sign out (Cognito)
           </button>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      <h2 className="text-lg font-semibold mb-4">Not signed in</h2>
-      <button
-        onClick={() => auth.signinRedirect()}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-      >
-        Sign in
-      </button>
-    </div>
+    </main>
+  ) : (
+    <main className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="max-w-xl w-full bg-white p-10 rounded-xl shadow-md text-center space-y-6">
+        <h1 className="text-3xl font-bold text-gray-800">
+          Welcome to TaskFlow
+        </h1>
+        <p className="text-gray-600 text-base">
+          TaskFlow helps admins assign tasks and team members track progress, meet deadlines, and stay updated in real time.
+        </p>
+        <button
+          onClick={() => auth.signinRedirect()}
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+        >
+          Sign In to Continue
+        </button>
+      </div>
+    </main>
   );
 }
