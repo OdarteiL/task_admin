@@ -2,156 +2,147 @@
 
 import { useAuth } from "react-oidc-context";
 import { useEffect, useState } from "react";
+import dayjs from "dayjs";
 
 interface Task {
-  taskId: string;
+  id: string;
   title: string;
-  description: string;
+  description?: string;
   assignedTo: string;
-  dueDate: string;
   status: string;
+  dueDate?: string;
 }
 
-export default function TeamPage() {
+export default function TeamDashboard() {
   const auth = useAuth();
+  const userEmail = auth.user?.profile.email || "";
+
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Track updated statuses before submit: { taskId: newStatus }
-  const [pendingStatusUpdates, setPendingStatusUpdates] = useState<
-    Record<string, string>
-  >({});
-  // Track loading states per task when submitting
-  const [submittingTasks, setSubmittingTasks] = useState<Record<string, boolean>>({});
+  const [message, setMessage] = useState("");
+  const [filterDate, setFilterDate] = useState<string>("");
 
-  const username =
-    auth.user?.profile?.preferred_username ||
-    auth.user?.profile?.username ||
-    auth.user?.profile?.email ||
-    "";
-
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const res = await fetch(
-          `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks?assignedTo=${username}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch tasks");
-        const data = await res.json();
-        setTasks(data);
-      } catch (err) {
-        console.error("Failed to fetch tasks", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (auth.isAuthenticated && username) {
-      fetchTasks();
-    }
-  }, [auth.isAuthenticated, username]);
-
-  const handleStatusChange = (taskId: string, newStatus: string) => {
-    setPendingStatusUpdates((prev) => ({ ...prev, [taskId]: newStatus }));
-  };
-
-  const handleSubmit = async (taskId: string) => {
-    const newStatus = pendingStatusUpdates[taskId];
-    if (!newStatus) {
-      alert("Please select a status before submitting.");
-      return;
-    }
-
-    setSubmittingTasks((prev) => ({ ...prev, [taskId]: true }));
+  const fetchTasks = async () => {
+    if (!userEmail) return;
 
     try {
-      const accessToken = auth.user?.access_token;
+      const res = await fetch(
+        `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks?assignedTo=${userEmail}`
+      );
+      const data = await res.json();
+      setTasks(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch tasks", err);
+      setTasks([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [userEmail]);
+
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    try {
       const res = await fetch(
         `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${taskId}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ status: newStatus }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
         }
       );
-
-      if (!res.ok) {
-        throw new Error("Failed to update status");
-      }
-
-      // Update local tasks list to reflect new status after submit
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.taskId === taskId ? { ...task, status: newStatus } : task
-        )
-      );
-
-      // Remove from pending updates
-      setPendingStatusUpdates((prev) => {
-        const copy = { ...prev };
-        delete copy[taskId];
-        return copy;
-      });
-    } catch (error) {
-      console.error(error);
-      alert("Error submitting status update");
-    } finally {
-      setSubmittingTasks((prev) => ({ ...prev, [taskId]: false }));
+      if (!res.ok) throw new Error("Failed to update task");
+      fetchTasks();
+    } catch (err) {
+      console.error("Update failed", err);
+      setMessage("❌ Failed to update task.");
     }
   };
 
-  if (auth.isLoading || !auth.isAuthenticated) {
-    return <p className="p-6 text-gray-600">Loading tasks...</p>;
-  }
+  const handleStatusChange = (id: string, status: string) => {
+    updateTask(id, { status });
+  };
+
+  const handleDescriptionChange = (id: string, description: string) => {
+    updateTask(id, { description });
+  };
+
+  const isOverdue = (dateStr?: string) => {
+    return dateStr && dayjs().isAfter(dayjs(dateStr), "day");
+  };
+
+  const filteredTasks = filterDate
+    ? tasks.filter((task) => task.dueDate === filterDate)
+    : tasks;
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-semibold mb-4">Welcome, {String(username)}</h2>
+    <div className="max-w-3xl mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-4">Team Member Dashboard</h2>
+      <p className="mb-4 text-gray-600">Welcome, {userEmail}</p>
 
-      {loading ? (
-        <p>Loading assigned tasks...</p>
-      ) : tasks.length === 0 ? (
-        <p>No tasks assigned yet.</p>
+      <label className="block mb-4">
+        <span className="text-gray-700">📅 Filter by Due Date:</span>
+        <input
+          type="date"
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          className="border p-2 rounded w-full mt-1"
+        />
+      </label>
+
+      {filteredTasks.length === 0 ? (
+        <p className="text-gray-500">No tasks assigned.</p>
       ) : (
-        <ul className="space-y-4">
-          {tasks.map((task) => {
-            const pendingStatus = pendingStatusUpdates[task.taskId];
-            return (
-              <li
-                key={task.taskId}
-                className="border p-4 rounded-lg shadow-sm bg-white"
+        filteredTasks.map((task) => (
+          <div
+            key={task.id}
+            className={`p-4 mb-4 rounded shadow ${
+              isOverdue(task.dueDate)
+                ? "bg-red-100 border border-red-400"
+                : "bg-white"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">{task.title}</h3>
+              <span
+                className={`px-2 py-1 text-sm rounded ${
+                  task.status === "Completed"
+                    ? "bg-green-200 text-green-800"
+                    : "bg-yellow-200 text-yellow-800"
+                }`}
               >
-                <h3 className="font-bold text-lg">{task.title}</h3>
-                <p className="text-sm text-gray-600">{task.description}</p>
-                <p className="text-sm">Due: {task.dueDate}</p>
+                {task.status}
+              </span>
+            </div>
 
-                <label className="text-sm font-semibold mr-2">Status:</label>
-                <select
-                  value={pendingStatus ?? task.status}
-                  onChange={(e) =>
-                    handleStatusChange(task.taskId, e.target.value)
-                  }
-                  className="border rounded p-1"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                </select>
+            <p className="text-sm text-gray-600 mt-1">
+              Due:{" "}
+              {task.dueDate
+                ? dayjs(task.dueDate).format("MMM D, YYYY")
+                : "No due date"}
+            </p>
 
-                <button
-                  onClick={() => handleSubmit(task.taskId)}
-                  disabled={submittingTasks[task.taskId]}
-                  className="ml-4 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {submittingTasks[task.taskId] ? "Submitting..." : "Submit Task"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+            <textarea
+              className="w-full border rounded p-2 mt-2"
+              rows={3}
+              value={task.description || ""}
+              onChange={(e) => handleDescriptionChange(task.id, e.target.value)}
+              placeholder="Update description"
+            />
+
+            <select
+              className="mt-2 border p-2 rounded w-full"
+              value={task.status}
+              onChange={(e) => handleStatusChange(task.id, e.target.value)}
+            >
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        ))
       )}
+
+      <p className="text-sm text-gray-700 mt-4">{message}</p>
     </div>
   );
 }
