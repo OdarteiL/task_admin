@@ -6,7 +6,10 @@ import React from "react";
 const oidcConfig = {
   authority: "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_TaZwHKR2d",
   client_id: "6n0odlf9mqqo07mcldq0l1has6",
-  redirect_uri: "http://localhost:3000",
+  redirect_uri:
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://main.d345rptlcv0lr0.amplifyapp.com", // fallback for SSR safety
   response_type: "code",
   scope: "email openid phone",
 };
