@@ -14,6 +14,10 @@ interface Task {
 
 export default function AdminPage() {
   const auth = useAuth();
+  
+  const handleLogout = () => {
+    auth.signoutRedirect();
+  };
 
   const [form, setForm] = useState({
     taskId: "",
@@ -193,11 +197,20 @@ export default function AdminPage() {
                 Welcome, {auth.user?.profile.email}
               </p>
             </div>
-            <div className="hidden md:block">
-              <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
                 <span className="animate-pulse h-3 w-3 bg-green-400 rounded-full"></span>
                 <span className="text-sm">Active Session</span>
               </div>
+              <button 
+                onClick={handleLogout}
+                className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-lg transition-all flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+              </button>
             </div>
           </div>
         </div>
