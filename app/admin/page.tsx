@@ -54,37 +54,37 @@ export default function AdminPage() {
     }
   };
 
+//   const fetchUsers = async () => {
+//   try {
+//     const res = await fetch("https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users");
+
+//     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+//     const raw = await res.json();
+
+//     // If the body is a stringified array, parse it
+//     const data = typeof raw === "string" ? JSON.parse(raw) :
+//                  typeof raw.body === "string" ? JSON.parse(raw.body) :
+//                  raw.body;
+
+//     setUsers(Array.isArray(data) ? data : []);
+//   } catch (err: any) {
+//     console.error("Fetch users error:", err.message);
+//     setUsers([]);
+//   }
+// };
+
+
   const fetchUsers = async () => {
-  try {
-    const res = await fetch("https://0xgz6dejak.execute-api.us-east-1.amazonaws.com/users");
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const raw = await res.json();
-
-    // If the body is a stringified array, parse it
-    const data = typeof raw === "string" ? JSON.parse(raw) :
-                 typeof raw.body === "string" ? JSON.parse(raw.body) :
-                 raw.body;
-
-    setUsers(Array.isArray(data) ? data : []);
-  } catch (err: any) {
-    console.error("Fetch users error:", err.message);
-    setUsers([]);
-  }
-};
-
-
-  // const fetchUsers = async () => {
-  //   try {
-  //     const res = await fetch("https://0xgz6dejak.execute-api.us-east-1.amazonaws.com/users");
-  //     const data = await res.json();
-  //     setUsers(Array.isArray(data) ? data : []);
-  //   } catch (err: any) {
-  //     console.error("Fetch users error:", err.message);
-  //     setUsers([]);
-  //   }
-  // };
+    try {
+      const res = await fetch("https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users");
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error("Fetch users error:", err.message);
+      setUsers([]);
+    }
+  };
 
   useEffect(() => {
     if (auth.user?.profile.email) {
@@ -154,7 +154,7 @@ export default function AdminPage() {
     if (!confirm(`Delete user ${email}?`)) return;
 
     try {
-      const res = await fetch(`https://okswggf9u7.execute-api.us-east-1.amazonaws.com/users/${encodeURIComponent(email)}`, {
+      const res = await fetch(`https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users/${encodeURIComponent(email)}`, {
         method: "DELETE",
       });
 
