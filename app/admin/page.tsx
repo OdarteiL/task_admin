@@ -2,6 +2,7 @@
 
 import { useAuth } from "react-oidc-context";
 import { useState, useEffect } from "react";
+import dayjs from "dayjs";
 
 interface Task {
   id: string;
@@ -12,13 +13,15 @@ interface Task {
   dueDate?: string;
 }
 
+interface User {
+  email: string;
+  role: string;
+}
+
 export default function AdminPage() {
   const auth = useAuth();
-  
-  const handleLogout = () => {
-    auth.signoutRedirect();
-  };
 
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [form, setForm] = useState({
     taskId: "",
     title: "",
@@ -26,83 +29,165 @@ export default function AdminPage() {
     assignedTo: "",
     dueDate: "",
   });
-
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Task>>({});
   const [message, setMessage] = useState("");
-  const [deadlineFilter, setDeadlineFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchTasks = async () => {
-    if (!auth.user?.profile.email) return;
-    setIsLoading(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [userForm, setUserForm] = useState({ email: "", role: "field_team" });
+  const [userMessage, setUserMessage] = useState("");
 
+  const handleLogout = () => auth.signoutRedirect();
+
+  const fetchTasks = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch(
-        `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks`
-      );
-      if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+      const res = await fetch("https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks");
       const data = await res.json();
       setTasks(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error("Failed to fetch tasks:", err.message);
+      console.error("Fetch tasks error:", err.message);
       setTasks([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchUsers = async () => {
+  try {
+    const res = await fetch("https://0xgz6dejak.execute-api.us-east-1.amazonaws.com/users");
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const raw = await res.json();
+
+    // If the body is a stringified array, parse it
+    const data = typeof raw === "string" ? JSON.parse(raw) :
+                 typeof raw.body === "string" ? JSON.parse(raw.body) :
+                 raw.body;
+
+    setUsers(Array.isArray(data) ? data : []);
+  } catch (err: any) {
+    console.error("Fetch users error:", err.message);
+    setUsers([]);
+  }
+};
+
+
+  // const fetchUsers = async () => {
+  //   try {
+  //     const res = await fetch("https://0xgz6dejak.execute-api.us-east-1.amazonaws.com/users");
+  //     const data = await res.json();
+  //     setUsers(Array.isArray(data) ? data : []);
+  //   } catch (err: any) {
+  //     console.error("Fetch users error:", err.message);
+  //     setUsers([]);
+  //   }
+  // };
+
   useEffect(() => {
-    fetchTasks();
+    if (auth.user?.profile.email) {
+      fetchTasks();
+      fetchUsers();
+    }
   }, [auth.user]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const handleTaskChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleUserChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setUserForm({ ...userForm, [e.target.name]: e.target.value });
+
+  const submitTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("Submitting...");
     setIsLoading(true);
+    setMessage("Submitting...");
 
     try {
-      const res = await fetch(
-        "https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        }
-      );
+      const res = await fetch("https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
       if (res.ok) {
         setMessage("✅ Task created successfully!");
-        setForm({
-          taskId: "",
-          title: "",
-          description: "",
-          assignedTo: "",
-          dueDate: "",
-        });
+        setForm({ taskId: "", title: "", description: "", assignedTo: "", dueDate: "" });
         fetchTasks();
       } else {
         const err = await res.json();
         setMessage(`❌ Error: ${err.message || res.statusText}`);
       }
     } catch (err) {
-      console.error(err);
       setMessage("❌ Failed to connect to API");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const startEdit = (task: Task) => {
-    setEditingTaskId(task.id);
-    setEditForm({ ...task });
+  const submitUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserMessage("Submitting...");
+
+    try {
+      const res = await fetch("https://okswggf9u7.execute-api.us-east-1.amazonaws.com/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userForm),
+      });
+
+      if (res.ok) {
+        setUserMessage("✅ User created.");
+        setUserForm({ email: "", role: "field_team" });
+        fetchUsers();
+      } else {
+        const err = await res.json();
+        setUserMessage(`❌ Error: ${err.message || res.statusText}`);
+      }
+    } catch (err) {
+      setUserMessage("❌ Failed to create user.");
+    }
+  };
+
+  const deleteUser = async (email: string) => {
+    if (!confirm(`Delete user ${email}?`)) return;
+
+    try {
+      const res = await fetch(`https://okswggf9u7.execute-api.us-east-1.amazonaws.com/users/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setUserMessage("🗑️ User deleted.");
+        fetchUsers();
+      } else {
+        const err = await res.json();
+        setUserMessage(`❌ Error: ${err.message || res.statusText}`);
+      }
+    } catch (err) {
+      setUserMessage("❌ Failed to delete user.");
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    if (!confirm("Delete this task?")) return;
+
+    try {
+      const res = await fetch(`https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setMessage("🗑️ Task deleted.");
+        fetchTasks();
+      } else {
+        const err = await res.json();
+        setMessage(`❌ Error: ${err.message || res.statusText}`);
+      }
+    } catch (err) {
+      setMessage("❌ Delete failed");
+    }
   };
 
   const saveEdit = async () => {
@@ -110,433 +195,147 @@ export default function AdminPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${editingTaskId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editForm),
-        }
-      );
+      const res = await fetch(`https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${editingTaskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
 
       if (res.ok) {
-        setMessage("✅ Task updated successfully!");
+        setMessage("✅ Task updated.");
         setEditingTaskId(null);
         fetchTasks();
       } else {
         const err = await res.json();
-        setMessage(`❌ Update error: ${err.message || res.statusText}`);
+        setMessage(`❌ Error: ${err.message || res.statusText}`);
       }
     } catch (err) {
-      console.error("Update failed", err);
       setMessage("❌ Update failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteTask = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
-    
-    setIsLoading(true);
-    try {
-      const res = await fetch(
-        `https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (res.ok) {
-        setMessage("🗑️ Task deleted successfully.");
-        fetchTasks();
-      } else {
-        const err = await res.json();
-        setMessage(`❌ Delete error: ${err.message || res.statusText}`);
-      }
-    } catch (err) {
-      console.error("Delete failed", err);
-      setMessage("❌ Delete failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filteredTasks = deadlineFilter
-    ? tasks.filter((task) => task.dueDate === deadlineFilter)
-    : tasks;
-
-  const isOverdue = (dateStr?: string): boolean => {
+  const isOverdue = (dateStr?: string) => {
     if (!dateStr) return false;
-    const today = new Date().toISOString().split("T")[0];
+    const today = dayjs().format("YYYY-MM-DD");
     return dateStr < today;
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "in progress":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">Field Team Admin Dashboard</h1>
-              <p className="text-blue-100 mt-1">
-                Welcome, {auth.user?.profile.email}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-                <span className="animate-pulse h-3 w-3 bg-green-400 rounded-full"></span>
-                <span className="text-sm">Active Session</span>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-lg transition-all flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout
-              </button>
-            </div>
-          </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <header className="flex justify-between items-center bg-gradient-to-r from-indigo-700 to-purple-700 text-white p-6 rounded-lg shadow-lg">
+        <div>
+          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+          <p className="text-indigo-100">{auth.user?.profile.email}</p>
         </div>
+        <button
+          onClick={handleLogout}
+          className="bg-white text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-100 transition-colors flex items-center"
+        >
+          Logout
+        </button>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Create Task Form */}
-          <div className="lg:col-span-1">
-            <form
-              onSubmit={handleSubmit}
-              className="bg-white p-6 shadow-md rounded-xl space-y-4 sticky top-6"
-            >
-              <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">
-                Create New Task
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Task ID
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    name="taskId"
-                    placeholder="Enter task ID"
-                    value={form.taskId}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    name="title"
-                    placeholder="Enter task title"
-                    value={form.title}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assign To
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    name="assignedTo"
-                    placeholder="Enter email address"
-                    value={form.assignedTo}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Due Date
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    name="dueDate"
-                    type="date"
-                    value={form.dueDate}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    name="description"
-                    placeholder="Enter task description"
-                    value={form.description}
-                    onChange={handleChange}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              
-              <button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span className="inline-flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </span>
-                ) : "Create Task"}
-              </button>
-              
-              {message && (
-                <div className={`text-sm p-2 rounded ${message.includes("❌") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-                  {message}
-                </div>
-              )}
-            </form>
+      {/* Forms */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Create Task Form */}
+        <section className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+            <h2 className="text-xl font-semibold text-indigo-800">Create Task</h2>
           </div>
+          <form onSubmit={submitTask} className="p-6 space-y-4">
+            <input className="input" name="taskId" value={form.taskId} onChange={handleTaskChange} placeholder="Task ID" required />
+            <input className="input" name="title" value={form.title} onChange={handleTaskChange} placeholder="Title" required />
+            <input className="input" name="assignedTo" value={form.assignedTo} onChange={handleTaskChange} placeholder="Assigned To" required />
+            <input className="input" type="date" name="dueDate" value={form.dueDate} onChange={handleTaskChange} required />
+            <textarea className="input" name="description" value={form.description} onChange={handleTaskChange} placeholder="Description" rows={3} />
+            <button type="submit" className="btn bg-indigo-600 text-white" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Task"}
+            </button>
+            {message && <p>{message}</p>}
+          </form>
+        </section>
 
-          {/* Right Column - Task List */}
-          <div className="lg:col-span-2">
-            {/* Filter */}
-            <div className="bg-white p-4 rounded-lg shadow-md mb-6 flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label htmlFor="deadlineFilter" className="font-medium text-gray-700 whitespace-nowrap">
-                  Filter by Due Date:
-                </label>
-                <input
-                  id="deadlineFilter"
-                  type="date"
-                  className="border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={deadlineFilter}
-                  onChange={(e) => setDeadlineFilter(e.target.value)}
-                />
-              </div>
-              
-              {deadlineFilter && (
-                <button
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
-                  onClick={() => setDeadlineFilter("")}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear Filter
-                </button>
-              )}
-              
-              <div className="ml-auto text-sm text-gray-500">
-                {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'} found
-              </div>
-            </div>
-
-            {/* Task List */}
-            {isLoading && tasks.length === 0 ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            ) : filteredTasks.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">No tasks found</h3>
-                <p className="mt-1 text-gray-500">
-                  {deadlineFilter ? "Try changing your filter or" : "Get started by"} creating a new task.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredTasks
-                  .sort((a, b) =>
-                    a.dueDate && b.dueDate ? a.dueDate.localeCompare(b.dueDate) : 0
-                  )
-                  .map((task) => {
-                    const overdue = isOverdue(task.dueDate);
-                    const statusClass = getStatusBadgeClass(task.status);
-
-                    return (
-                      <div
-                        key={task.id}
-                        className={`bg-white rounded-lg shadow-md transition-all hover:shadow-lg ${
-                          overdue && !editingTaskId ? "border-l-4 border-red-500" : ""
-                        }`}
-                      >
-                        {editingTaskId === task.id ? (
-                          <div className="p-5 space-y-4">
-                            <h3 className="font-medium text-gray-700">Edit Task</h3>
-                            <div className="space-y-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Title
-                                </label>
-                                <input
-                                  className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  value={editForm.title || ""}
-                                  onChange={(e) =>
-                                    setEditForm({ ...editForm, title: e.target.value })
-                                  }
-                                  required
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Description
-                                </label>
-                                <textarea
-                                  className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  value={editForm.description || ""}
-                                  onChange={(e) =>
-                                    setEditForm({
-                                      ...editForm,
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  rows={3}
-                                />
-                              </div>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Status
-                                  </label>
-                                  <select
-                                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={editForm.status || ""}
-                                    onChange={(e) =>
-                                      setEditForm({ ...editForm, status: e.target.value })
-                                    }
-                                  >
-                                    <option value="">Select status</option>
-                                    <option value="Pending">Pending</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Completed">Completed</option>
-                                  </select>
-                                </div>
-                                
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Due Date
-                                  </label>
-                                  <input
-                                    className="w-full border border-gray-300 p-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={editForm.dueDate || ""}
-                                    type="date"
-                                    onChange={(e) =>
-                                      setEditForm({ ...editForm, dueDate: e.target.value })
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex gap-2 pt-2">
-                              <button
-                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition flex-1"
-                                onClick={saveEdit}
-                                disabled={isLoading}
-                              >
-                                {isLoading ? "Saving..." : "Save Changes"}
-                              </button>
-                              <button
-                                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md transition"
-                                onClick={() => setEditingTaskId(null)}
-                                disabled={isLoading}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-5">
-                            <div className="flex flex-wrap justify-between items-start gap-2">
-                              <div className="flex-grow">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="font-bold text-lg text-gray-800">{task.title}</h3>
-                                  <span className={`text-xs px-2 py-1 rounded-full border ${statusClass}`}>
-                                    {task.status || "No Status"}
-                                  </span>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 mb-3 text-sm">
-                                  <p className="text-gray-600">
-                                    <span className="font-medium">ID:</span> {task.id}
-                                  </p>
-                                  <p className="text-gray-600">
-                                    <span className="font-medium">Assigned to:</span> {task.assignedTo}
-                                  </p>
-                                  <p className={`${overdue ? "text-red-600 font-medium" : "text-gray-600"}`}>
-                                    <span className="font-medium">Due:</span> {task.dueDate || "N/A"}
-                                    {overdue && " (Overdue)"}
-                                  </p>
-                                </div>
-                                
-                                {task.description && (
-                                  <div className="mt-3 bg-gray-50 p-3 rounded-md">
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                      {task.description}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="flex gap-2">
-                                <button
-                                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded-md transition flex items-center text-sm"
-                                  onClick={() => startEdit(task)}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
-                                </button>
-                                <button
-                                  className="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1 rounded-md transition flex items-center text-sm"
-                                  onClick={() => deleteTask(task.id)}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
+        {/* Create User Form */}
+        <section className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+            <h2 className="text-xl font-semibold text-indigo-800">Create User</h2>
           </div>
-        </div>
+          <form onSubmit={submitUser} className="p-6 space-y-4">
+            <input className="input" name="email" value={userForm.email} onChange={handleUserChange} placeholder="Email" required />
+            <select className="input" name="role" value={userForm.role} onChange={handleUserChange}>
+              <option value="admin">Admin</option>
+              <option value="field_team">Field Team</option>
+            </select>
+            <button type="submit" className="btn bg-indigo-600 text-white">Create User</button>
+            {userMessage && <p>{userMessage}</p>}
+          </form>
+        </section>
       </div>
+
+      {/* Task List */}
+      <section className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+          <h2 className="text-xl font-semibold text-indigo-800">Task List</h2>
+        </div>
+        {tasks.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">No tasks found.</div>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {tasks.map(task => (
+              <li key={task.id} className={`p-4 ${isOverdue(task.dueDate) ? 'bg-red-50 border-l-4 border-red-500' : ''}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-bold text-lg">{task.title}</h3>
+                  <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">{task.status}</span>
+                </div>
+                <p className="text-sm text-gray-600">Assigned to: {task.assignedTo} | Due: {task.dueDate}</p>
+                <p className="mt-1">{task.description}</p>
+                <div className="flex space-x-2 mt-3">
+                  <button onClick={() => { setEditingTaskId(task.id); setEditForm(task); }} className="btn-sm bg-blue-100 text-blue-700">Edit</button>
+                  <button onClick={() => deleteTask(task.id)} className="btn-sm bg-red-100 text-red-700">Delete</button>
+                </div>
+                {editingTaskId === task.id && (
+                  <div className="mt-4 space-y-2">
+                    <input className="input" value={editForm.title || ""} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+                    <input className="input" type="date" value={editForm.dueDate || ""} onChange={e => setEditForm({ ...editForm, dueDate: e.target.value })} />
+                    <select className="input" value={editForm.status || ""} onChange={e => setEditForm({ ...editForm, status: e.target.value })}>
+                      <option value="Not Started">Not Started</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                    <textarea className="input" rows={2} value={editForm.description || ""} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                    <div className="flex space-x-2">
+                      <button onClick={saveEdit} className="btn bg-green-600 text-white">Save</button>
+                      <button onClick={() => setEditingTaskId(null)} className="btn bg-gray-300">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* User List */}
+      <section className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+          <h2 className="text-xl font-semibold text-indigo-800">User List</h2>
+        </div>
+        {users.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">No users found.</div>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {users.map(user => (
+              <li key={user.email} className="p-4 flex justify-between items-center">
+                <span>{user.email} <span className="text-sm text-gray-500">({user.role})</span></span>
+                <button onClick={() => deleteUser(user.email)} className="text-red-600 hover:underline">Delete</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
