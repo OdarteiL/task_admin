@@ -131,7 +131,7 @@ export default function AdminPage() {
     setUserMessage("Submitting...");
 
     try {
-      const res = await fetch("https://okswggf9u7.execute-api.us-east-1.amazonaws.com/users", {
+      const res = await fetch("https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userForm),
