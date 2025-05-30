@@ -122,4 +122,4 @@ MIT License. Free to use and modify.
 
 ## Author & Contributions
 
-Developed by [Your Name]. Contributions and feedback are welcome.
+Developed by Michael Odartei Lamptey. Contributions and feedback are welcome.

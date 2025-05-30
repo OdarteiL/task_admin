@@ -33,6 +33,7 @@ export default function AdminPage() {
   const [editForm, setEditForm] = useState<Partial<Task>>({});
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 
   const [users, setUsers] = useState<User[]>([]);
   const [userForm, setUserForm] = useState({ email: "", role: "field_team" });
@@ -223,6 +224,7 @@ export default function AdminPage() {
   const saveEdit = async () => {
     if (!editingTaskId) return;
     setIsLoading(true);
+    setLoadingTaskId(editingTaskId);
 
     try {
       const res = await fetch(`https://okswggf9u7.execute-api.us-east-1.amazonaws.com/tasks/${editingTaskId}`, {
@@ -233,7 +235,7 @@ export default function AdminPage() {
 
       if (res.ok) {
         setMessage("✅ Task updated.");
-        setEditingTaskId(null);
+        setEditingTaskId(null); // Clear the editing state
         fetchTasks();
       } else {
         const err = await res.json();
@@ -243,6 +245,7 @@ export default function AdminPage() {
       setMessage("❌ Update failed");
     } finally {
       setIsLoading(false);
+      setLoadingTaskId(null);
     }
   };
 
@@ -337,8 +340,21 @@ export default function AdminPage() {
                     </select>
                     <textarea className="input" rows={2} value={editForm.description || ""} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
                     <div className="flex space-x-2">
-                      <button onClick={saveEdit} className="btn bg-green-600 text-white">Save</button>
-                      <button onClick={() => setEditingTaskId(null)} className="btn bg-gray-300">Cancel</button>
+                      <button 
+                      type="button"
+                      onClick={saveEdit} 
+                      className="btn bg-green-600 text-white"
+                      disabled={loadingTaskId === task.id}
+                    >
+                      {loadingTaskId === task.id ? "Saving..." : "Save"}
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setEditingTaskId(null)} 
+                      className="btn bg-gray-300"
+                    >
+                      Cancel
+                    </button>
                     </div>
                   </div>
                 )}
