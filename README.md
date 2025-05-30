@@ -120,6 +120,24 @@ MIT License. Free to use and modify.
 
 ---
 
+
+## Live Demo
+
+Access the deployed application here:  
+**[https://main.d345rptlcv0lr0.amplifyapp.com/](https://main.d345rptlcv0lr0.amplifyapp.com/)**
+
+---
+
+## Admin Login Credentials
+
+Use the following credentials to log in as Admin via the Cognito Hosted UI:
+
+- **Username:** `field_admin1`  
+- **Password:** `Admin123!`
+
+> Please change or secure these credentials in production environments.
+
+
 ## Author & Contributions
 
 Developed by Michael Odartei Lamptey. Contributions and feedback are welcome.
