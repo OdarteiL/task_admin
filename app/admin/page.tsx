@@ -150,25 +150,55 @@ export default function AdminPage() {
     }
   };
 
+
   const deleteUser = async (email: string) => {
-    if (!confirm(`Delete user ${email}?`)) return;
+  console.log("Deleting email:", email); // DEBUG
 
-    try {
-      const res = await fetch(`https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users/${encodeURIComponent(email)}`, {
-        method: "DELETE",
-      });
+  if (!confirm(`Delete user ${email}?`)) return;
 
-      if (res.ok) {
-        setUserMessage("🗑️ User deleted.");
-        fetchUsers();
-      } else {
-        const err = await res.json();
-        setUserMessage(`❌ Error: ${err.message || res.statusText}`);
-      }
-    } catch (err) {
-      setUserMessage("❌ Failed to delete user.");
+  try {
+    const url = `https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users/${email}`;
+    console.log("DELETE URL:", url); // DEBUG
+
+    const res = await fetch(url, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setUserMessage("🗑️ User deleted.");
+      fetchUsers();
+    } else {
+      const body = await res.text();
+      console.error("DELETE failed:", res.status, body);
+      setUserMessage(`❌ Error: ${body}`);
     }
-  };
+  } catch (err: any) {
+    console.error("Fetch delete failed:", err.message);
+    setUserMessage("❌ Failed to delete user.");
+  }
+};
+
+
+
+  // const deleteUser = async (email: string) => {
+  //   if (!confirm(`Delete user ${email}?`)) return;
+
+  //   try {
+  //     const res = await fetch(`https://q14p2u9d42.execute-api.us-east-1.amazonaws.com/users/${encodeURIComponent(email)}`, {
+  //       method: "DELETE",
+  //     });
+
+  //     if (res.ok) {
+  //       setUserMessage("🗑️ User deleted.");
+  //       fetchUsers();
+  //     } else {
+  //       const err = await res.json();
+  //       setUserMessage(`❌ Error: ${err.message || res.statusText}`);
+  //     }
+  //   } catch (err) {
+  //     setUserMessage("❌ Failed to delete user.");
+  //   }
+  // };
 
   const deleteTask = async (id: string) => {
     if (!confirm("Delete this task?")) return;
