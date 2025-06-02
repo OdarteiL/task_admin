@@ -9,7 +9,7 @@ const oidcConfig = {
   redirect_uri:
     typeof window !== "undefined"
       ? window.location.origin
-      : "https://main.d345rptlcv0lr0.amplifyapp.com", 
+      : "https://test.d2m0pe5brft3n0.amplifyapp.com", 
   response_type: "code",
   scope: "email openid phone",
 };
