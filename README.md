@@ -135,7 +135,6 @@ Use the following credentials to log in as Admin via the Cognito Hosted UI:
 - **Username:** `field_admin1`  
 - **Password:** `A******` Please contact odarteiL for this
 
-> Please change or secure these credentials in production environments.
 
 
 ## Author & Contributions
