@@ -132,9 +132,11 @@ Access the deployed application here:
 
 Use the following credentials to log in as Admin via the Cognito Hosted UI:
 
+- **Username:** `demo`  
+- **Password:** `Demo1234!` Please contact odarteiL for this
+
 - **Username:** `field_admin1`  
 - **Password:** `A******` Please contact odarteiL for this
-
 
 
 ## Author & Contributions
